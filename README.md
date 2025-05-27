@@ -8,7 +8,7 @@
 
 * 博文地址：[一句代码搞定权限请求，从未如此简单](https://www.jianshu.com/p/c69ff8a445ed)
 
-* 可以扫码下载 Demo 进行演示或者测试，如果扫码下载不了的，[点击此处可直接下载](https://github.com/getActivity/XXPermissions/releases/download/18.62/XXPermissions.apk)
+* 可以扫码下载 Demo 进行演示或者测试，如果扫码下载不了的，[点击此处可直接下载](https://github.com/getActivity/XXPermissions/releases/download/21.3/XXPermissions.apk)
 
 ![](picture/zh/download_demo_apk_qr_code.png)
 
@@ -61,7 +61,7 @@ android {
 
 dependencies {
     // 权限请求框架：https://github.com/getActivity/XXPermissions
-    implementation 'com.github.getActivity:XXPermissions:18.62'
+    implementation 'com.github.getActivity:XXPermissions:21.3'
 }
 ```
 
@@ -199,14 +199,6 @@ XXPermissions.setCheckMode(false);
 XXPermissions.setInterceptor(new OnPermissionInterceptor() {});
 ```
 
-#### 框架混淆规则
-
-* 在混淆规则文件 `proguard-rules.pro` 中加入
-
-```text
--keep class com.hjq.permissions.** {*;}
-```
-
 #### 关于权限监听回调参数说明
 
 * 我们都知道，如果用户全部授予只会调用 `onGranted` 方法，如果用户全部拒绝只会调用 `onDenied` 方法。
@@ -223,9 +215,9 @@ XXPermissions.setInterceptor(new OnPermissionInterceptor() {});
 
 |     适配细节    | [XXPermissions](https://github.com/getActivity/XXPermissions)  | [AndPermission](https://github.com/yanzhenjie/AndPermission) | [PermissionX](https://github.com/guolindev/PermissionX) |  [AndroidUtilCode-PermissionUtils](https://github.com/Blankj/AndroidUtilCode)   | [PermissionsDispatcher](https://github.com/permissions-dispatcher/PermissionsDispatcher) | [RxPermissions](https://github.com/tbruyelle/RxPermissions) |  [EasyPermissions](https://github.com/googlesamples/easypermissions) |
 | :--------: | :------------: | :------------: | :------------: | :------------: | :------------: | :------------: | :------------: |
-|    对应版本  |  18.62 |  2.0.3  |  1.7.1    |  1.31.0    |   4.9.2  |  0.12   |  3.0.0   |
+|    对应版本  |  21.3 |  2.0.3  |  1.8.1    |  1.31.0    |   4.9.2  |  0.12   |  3.0.0   |
 |    issues 数   |  [![](https://img.shields.io/github/issues/getActivity/XXPermissions.svg)](https://github.com/getActivity/XXPermissions/issues)  |  [![](https://img.shields.io/github/issues/yanzhenjie/AndPermission.svg)](https://github.com/yanzhenjie/AndPermission/issues)  |  [![](https://img.shields.io/github/issues/guolindev/PermissionX.svg)](https://github.com/guolindev/PermissionX/issues)  |  [![](https://img.shields.io/github/issues/Blankj/AndroidUtilCode.svg)](https://github.com/Blankj/AndroidUtilCode/issues)  |  [![](https://img.shields.io/github/issues/permissions-dispatcher/PermissionsDispatcher.svg)](https://github.com/permissions-dispatcher/PermissionsDispatcher/issues)  |  [![](https://img.shields.io/github/issues/tbruyelle/RxPermissions.svg)](https://github.com/tbruyelle/RxPermissions/issues)  |  [![](https://img.shields.io/github/issues/googlesamples/easypermissions.svg)](https://github.com/googlesamples/easypermissions/issues)  |
-|    框架体积  |  85 KB  | 127 KB  |  97 KB  |   500 KB |  99 KB  | 28 KB  | 48 KB |
+|    框架体积  |  92 KB  | 127 KB  |  97 KB  |   500 KB |  99 KB  | 28 KB  | 48 KB |
 |  框架维护状态 |**维护中**|  停止维护 | 停止维护 |  停止维护 | 停止维护 | 停止维护 | 停止维护 |
 |       闹钟提醒权限       |  ✅  |  ❌  |  ❌  |  ❌  |  ❌  |  ❌  |  ❌  |
 |     所有文件管理权限      |  ✅  |  ❌  |  ✅  |  ❌  |  ❌  |  ❌  |  ❌  |
@@ -300,7 +292,7 @@ XXPermissions.setInterceptor(new OnPermissionInterceptor() {});
 
 #### 后台申请权限场景介绍
 
-* 当我们做耗时操作之后申请权限（例如在闪屏页获取隐私协议再申请权限），在网络请求的过程中将 Activity 返回桌面去（退到后台），然后会导致权限请求是在后台状态中进行，在这个时机上就可能会导致权限申请不正常，表现为不会显示授权对话框，处理不当的还会导致崩溃，例如 [RxPeremission/issues/249](https://github.com/tbruyelle/RxPermissions/issues/249)。原因在于框架中的 PermissionFragment 在 `commit` / `commitNow` 到 Activity 的时候会做一个检测，如果 Activity 的状态是不可见时则会抛出异常，而 **RxPeremission** 正是使用了 `commitNow` 才会导致崩溃 ，使用 `commitAllowingStateLoss` / `commitNowAllowingStateLoss` 则可以避开这个检测，虽然这样可以避免崩溃，但是会出现另外一个问题，系统提供的 `requestPermissions` API 在 Activity 不可见时调用也不会弹出授权对话框，**XXPermissions** 的解决方式是将 `requestPermissions` 时机从 `onCreate` 转移到了 `onResume`，这是因为 `Activity` 和 `Fragment` 的生命周期方法是捆绑在一起的，如果 `Activity` 是不可见的，那么就算创建了 `Fragment` 也只会调用 `onCreate` 方法，而不会去调用它的 `onResume` 方法，最后当 Activity 从后台返回到前台时，不仅会触发 `Activity` 的 `onResume` 方法，也会触发 `PermissionFragment` 的 `onResume` 方法，在这个方法申请权限就可以保证最终 `requestPermissions` 调用的时机是在 `Activity` 处于可见状态的情况下。
+* 当我们做耗时操作之后申请权限（例如在闪屏页获取隐私协议再申请权限），在网络请求的过程中将 Activity 返回桌面去（退到后台），然后会导致权限请求是在后台状态中进行，在这个时机上就可能会导致权限申请不正常，表现为不会显示授权对话框，处理不当的还会导致崩溃，例如 [RxPermissions/issues/249](https://github.com/tbruyelle/RxPermissions/issues/249)。原因在于框架中的 PermissionFragment 在 `commit` / `commitNow` 到 Activity 的时候会做一个检测，如果 Activity 的状态是不可见时则会抛出异常，而 **RxPermission** 正是使用了 `commitNow` 才会导致崩溃 ，使用 `commitAllowingStateLoss` / `commitNowAllowingStateLoss` 则可以避开这个检测，虽然这样可以避免崩溃，但是会出现另外一个问题，系统提供的 `requestPermissions` API 在 Activity 不可见时调用也不会弹出授权对话框，**XXPermissions** 的解决方式是将 `requestPermissions` 时机从 `onCreate` 转移到了 `onResume`，这是因为 `Activity` 和 `Fragment` 的生命周期方法是捆绑在一起的，如果 `Activity` 是不可见的，那么就算创建了 `Fragment` 也只会调用 `onCreate` 方法，而不会去调用它的 `onResume` 方法，最后当 Activity 从后台返回到前台时，不仅会触发 `Activity` 的 `onResume` 方法，也会触发 `PermissionFragment` 的 `onResume` 方法，在这个方法申请权限就可以保证最终 `requestPermissions` 调用的时机是在 `Activity` 处于可见状态的情况下。
 
 #### Android 12 内存泄漏问题修复介绍
 
@@ -349,8 +341,6 @@ XXPermissions.setInterceptor(new OnPermissionInterceptor() {});
         * 当项目的 `targetSdkVersion >= 30` 时，则不能申请 `READ_EXTERNAL_STORAGE` 和 `WRITE_EXTERNAL_STORAGE` 权限，而是应该申请 `MANAGE_EXTERNAL_STORAGE` 权限
 
         * 如果当前项目已经适配了分区存储，那么只需要在清单文件中注册一个 meta-data 属性即可： `<meta-data android:name="ScopedStorage" android:value="true" />`
-
-    * 如果申请的权限中包含后台定位权限， 那么这里面则不能包含和定位无关的权限，否则框架会抛出异常，因为 `ACCESS_BACKGROUND_LOCATION` 和其他非定位权限定位掺杂在一起申请，在 Android 11 上会出现不申请直接被拒绝的情况。
 
     * 如果申请的权限和项目中的 **targetSdkVersion** 对不上，框架会抛出异常，是因为 **targetSdkVersion** 代表着项目适配到哪个 Android 版本，系统会自动做向下兼容，假设申请的权限是 Android 11 才出现的，但是 **targetSdkVersion** 还停留在 29，那么在某些机型上的申请，会出现授权异常的情况，也就是用户明明授权了，但是系统返回的始终是 false。
 

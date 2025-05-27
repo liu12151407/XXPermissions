@@ -45,14 +45,14 @@ public final class XXPermissions {
     }
 
     /**
-     * 是否为检查模式
+     * 设置全局的检查模式
      */
     public static void setCheckMode(boolean checkMode) {
         sCheckMode = checkMode;
     }
 
     /**
-     * 设置全局权限请求拦截器
+     * 设置全局的权限请求拦截器
      */
     public static void setInterceptor(OnPermissionInterceptor interceptor) {
         sInterceptor = interceptor;
@@ -160,7 +160,7 @@ public final class XXPermissions {
         final OnPermissionInterceptor interceptor = mInterceptor;
 
         // 权限请求列表（为什么直接不用字段？因为框架要兼容新旧权限，在低版本下会自动添加旧权限申请，为了避免重复添加）
-        final List<String> permissions = new ArrayList<>(mPermissions);
+        List<String> permissions = new ArrayList<>(mPermissions);
 
         boolean checkMode = isCheckMode(context);
 
@@ -194,6 +194,8 @@ public final class XXPermissions {
             PermissionChecker.checkNearbyDevicesPermission(permissions, androidManifestInfo);
             // 检查对照片和视频的部分访问权限申请是否符合规范
             PermissionChecker.checkReadMediaVisualUserSelectedPermission(permissions);
+            // 检查读取应用列表权限是否符合规范
+            PermissionChecker.checkGetInstallAppsPermission(context, permissions, androidManifestInfo);
             // 检查申请的权限和 targetSdk 版本是否能吻合
             PermissionChecker.checkTargetSdkVersion(context, permissions);
             // 检测权限有没有在清单文件中注册
@@ -201,14 +203,12 @@ public final class XXPermissions {
         }
 
         // 优化所申请的权限列表
-        PermissionChecker.optimizeDeprecatedPermission(permissions);
+        permissions = PermissionApi.compatibleOldPermissionByNewPermission(permissions);
 
         if (PermissionApi.isGrantedPermissions(context, permissions)) {
             // 证明这些权限已经全部授予过，直接回调成功
-            if (callback != null) {
-                interceptor.grantedPermissionRequest(activity, permissions, permissions, true, callback);
-                interceptor.finishPermissionRequest(activity, permissions, true, callback);
-            }
+            interceptor.grantedPermissionRequest(activity, permissions, permissions, true, callback);
+            interceptor.finishPermissionRequest(activity, permissions, true, callback);
             return;
         }
 
@@ -361,11 +361,11 @@ public final class XXPermissions {
             startPermissionActivity(activity, permissions);
             return;
         }
-        Intent intent = PermissionUtils.getSmartPermissionIntent(context, permissions);
+        Intent intent = PermissionApi.getSmartPermissionIntent(context, permissions);
         if (!(context instanceof Activity)) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         }
-        StartActivityManager.startActivity(context, intent);
+        PermissionActivityIntentHandler.startActivity(context, intent);
     }
 
     /* android.app.Activity */
@@ -392,8 +392,8 @@ public final class XXPermissions {
     public static void startPermissionActivity(@NonNull Activity activity,
                                                @NonNull List<String> permissions,
                                                int requestCode) {
-        Intent intent = PermissionUtils.getSmartPermissionIntent(activity, permissions);
-        StartActivityManager.startActivityForResult(activity, intent, requestCode);
+        Intent intent = PermissionApi.getSmartPermissionIntent(activity, permissions);
+        PermissionActivityIntentHandler.startActivityForResult(activity, intent, requestCode);
     }
 
     public static void startPermissionActivity(@NonNull Activity activity,
@@ -412,10 +412,10 @@ public final class XXPermissions {
                                                @NonNull List<String> permissions,
                                                @Nullable OnPermissionPageCallback callback) {
         if (permissions.isEmpty()) {
-            StartActivityManager.startActivity(activity, PermissionIntentManager.getApplicationDetailsIntent(activity));
+            PermissionActivityIntentHandler.startActivity(activity, PermissionIntentManager.getApplicationDetailsIntent(activity));
             return;
         }
-        PermissionPageFragment.launch(activity, permissions, callback);
+        RequestSpecialPermissionFragment.launch(activity, permissions, callback);
     }
 
     /* android.app.Fragment */
@@ -447,11 +447,11 @@ public final class XXPermissions {
             return;
         }
         if (permissions.isEmpty()) {
-            StartActivityManager.startActivity(fragment, PermissionIntentManager.getApplicationDetailsIntent(activity));
+            PermissionActivityIntentHandler.startActivity(fragment, PermissionIntentManager.getApplicationDetailsIntent(activity));
             return;
         }
-        Intent intent = PermissionUtils.getSmartPermissionIntent(activity, permissions);
-        StartActivityManager.startActivityForResult(fragment, intent, requestCode);
+        Intent intent = PermissionApi.getSmartPermissionIntent(activity, permissions);
+        PermissionActivityIntentHandler.startActivityForResult(fragment, intent, requestCode);
     }
 
     public static void startPermissionActivity(@NonNull Fragment fragment,
@@ -477,10 +477,10 @@ public final class XXPermissions {
             return;
         }
         if (permissions.isEmpty()) {
-            StartActivityManager.startActivity(fragment, PermissionIntentManager.getApplicationDetailsIntent(activity));
+            PermissionActivityIntentHandler.startActivity(fragment, PermissionIntentManager.getApplicationDetailsIntent(activity));
             return;
         }
-        PermissionPageFragment.launch(activity, permissions, callback);
+        RequestSpecialPermissionFragment.launch(activity, permissions, callback);
     }
 
     /* android.support.v4.app.Fragment */
@@ -512,11 +512,11 @@ public final class XXPermissions {
             return;
         }
         if (permissions.isEmpty()) {
-            StartActivityManager.startActivity(fragment, PermissionIntentManager.getApplicationDetailsIntent(activity));
+            PermissionActivityIntentHandler.startActivity(fragment, PermissionIntentManager.getApplicationDetailsIntent(activity));
             return;
         }
-        Intent intent = PermissionUtils.getSmartPermissionIntent(activity, permissions);
-        StartActivityManager.startActivityForResult(fragment, intent, requestCode);
+        Intent intent = PermissionApi.getSmartPermissionIntent(activity, permissions);
+        PermissionActivityIntentHandler.startActivityForResult(fragment, intent, requestCode);
     }
 
     public static void startPermissionActivity(@NonNull android.support.v4.app.Fragment fragment,
@@ -542,9 +542,9 @@ public final class XXPermissions {
             return;
         }
         if (permissions.isEmpty()) {
-            StartActivityManager.startActivity(fragment, PermissionIntentManager.getApplicationDetailsIntent(activity));
+            PermissionActivityIntentHandler.startActivity(fragment, PermissionIntentManager.getApplicationDetailsIntent(activity));
             return;
         }
-        PermissionPageFragment.launch(activity, permissions, callback);
+        RequestSpecialPermissionFragment.launch(activity, permissions, callback);
     }
 }

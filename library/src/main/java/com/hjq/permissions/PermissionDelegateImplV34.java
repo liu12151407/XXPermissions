@@ -3,7 +3,6 @@ package com.hjq.permissions;
 import android.app.Activity;
 import android.content.Context;
 import android.support.annotation.NonNull;
-import android.support.annotation.RequiresApi;
 
 /**
  *    author : Android 轮子哥
@@ -11,37 +10,44 @@ import android.support.annotation.RequiresApi;
  *    time   : 2023/08/11
  *    desc   : Android 14 权限委托实现
  */
-@RequiresApi(api = AndroidVersion.ANDROID_14)
 class PermissionDelegateImplV34 extends PermissionDelegateImplV33 {
 
-   @Override
-   public boolean isGrantedPermission(@NonNull Context context, @NonNull String permission) {
-      if (PermissionUtils.equalsPermission(permission, Permission.READ_MEDIA_VISUAL_USER_SELECTED)) {
-         return PermissionUtils.checkSelfPermission(context, Permission.READ_MEDIA_VISUAL_USER_SELECTED);
-      }
+    @Override
+    public boolean isGrantedPermission(@NonNull Context context, @NonNull String permission) {
+        if (PermissionUtils.equalsPermission(permission, Permission.READ_MEDIA_VISUAL_USER_SELECTED)) {
+            if (!AndroidVersion.isAndroid14()) {
+                return true;
+            }
+            return PermissionUtils.checkSelfPermission(context, permission);
+        }
 
-       // 如果用户授予了部分照片访问，那么 READ_MEDIA_VISUAL_USER_SELECTED 权限状态是授予的，而 READ_MEDIA_IMAGES 权限状态是拒绝的
-       if (PermissionUtils.equalsPermission(permission, Permission.READ_MEDIA_IMAGES) &&
-           !PermissionUtils.checkSelfPermission(context, Permission.READ_MEDIA_IMAGES)) {
-           return PermissionUtils.checkSelfPermission(context, Permission.READ_MEDIA_VISUAL_USER_SELECTED);
-       }
+        return super.isGrantedPermission(context, permission);
+    }
 
-       // 如果用户授予了部分视频访问，那么 READ_MEDIA_VISUAL_USER_SELECTED 权限状态是授予的，而 READ_MEDIA_VIDEO 权限状态是拒绝的
-       if (PermissionUtils.equalsPermission(permission, Permission.READ_MEDIA_VIDEO) &&
-           !PermissionUtils.checkSelfPermission(context, Permission.READ_MEDIA_VIDEO)) {
-           return PermissionUtils.checkSelfPermission(context, Permission.READ_MEDIA_VISUAL_USER_SELECTED);
-       }
+    @Override
+    public boolean isDoNotAskAgainPermission(@NonNull Activity activity, @NonNull String permission) {
+        if (PermissionUtils.equalsPermission(permission, Permission.READ_MEDIA_VISUAL_USER_SELECTED)) {
+            if (!AndroidVersion.isAndroid14()) {
+                return false;
+            }
+            return !PermissionUtils.checkSelfPermission(activity, permission) &&
+                !PermissionUtils.shouldShowRequestPermissionRationale(activity, permission);
+        }
 
-      return super.isGrantedPermission(context, permission);
-   }
+        return super.isDoNotAskAgainPermission(activity, permission);
+    }
 
-   @Override
-   public boolean isDoNotAskAgainPermission(@NonNull Activity activity, @NonNull String permission) {
-      if (PermissionUtils.equalsPermission(permission, Permission.READ_MEDIA_VISUAL_USER_SELECTED)) {
-         return !PermissionUtils.checkSelfPermission(activity, permission) &&
-                 !PermissionUtils.shouldShowRequestPermissionRationale(activity, permission);
-      }
+    @Override
+    public boolean recheckPermissionResult(@NonNull Context context, @NonNull String permission, boolean grantResult) {
+        // 如果是在 Android 14 上面，并且是图片权限或者视频权限，则需要重新检查权限的状态
+        // 这是因为用户授权部分图片或者视频的时候，READ_MEDIA_VISUAL_USER_SELECTED 权限状态是授予的
+        // 但是 READ_MEDIA_IMAGES 和 READ_MEDIA_VIDEO 的权限状态是拒绝的
+        if (AndroidVersion.isAndroid14() &&
+            PermissionUtils.containsPermission(
+                new String[] {Permission.READ_MEDIA_IMAGES, Permission.READ_MEDIA_VIDEO}, permission)) {
+            return isGrantedPermission(context, Permission.READ_MEDIA_VISUAL_USER_SELECTED);
+        }
 
-      return super.isDoNotAskAgainPermission(activity, permission);
-   }
+        return super.recheckPermissionResult(context, permission, grantResult);
+    }
 }

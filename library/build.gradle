@@ -1,18 +1,11 @@
 apply plugin: 'com.android.library'
+apply from : '../common.gradle'
 
 android {
-    compileSdkVersion 34
 
     defaultConfig {
+        // 最低安装版本
         minSdkVersion 14
-        versionCode 1862
-        versionName "18.62"
-    }
-
-    // 使用 JDK 1.8
-    compileOptions {
-        targetCompatibility JavaVersion.VERSION_1_8
-        sourceCompatibility JavaVersion.VERSION_1_8
     }
 
     lintOptions {
@@ -32,44 +25,7 @@ android {
     }
 }
 
-afterEvaluate {
-    // 排除 BuildConfig.class 和 R.class
-    generateReleaseBuildConfig.enabled = false
-    generateDebugBuildConfig.enabled = false
-    generateReleaseResValues.enabled = false
-    generateDebugResValues.enabled = false
-}
-
 dependencies {
     // noinspection GradleCompatible
     compileOnly 'com.android.support:support-fragment:24.2.0'
-}
-
-tasks.withType(Javadoc).configureEach {
-    // prevent Javadoc from failing gradle build：https://stackoverflow.com/questions/35435173/prevent-javadoc-from-failing-gradle-build
-    failOnError false
-    options.addStringOption('Xdoclint:none', '-quiet')
-    options.addStringOption('encoding', 'UTF-8')
-    options.addStringOption('charSet', 'UTF-8')
-}
-
-tasks.register('sourcesJar', Jar) {
-    from android.sourceSets.main.java.srcDirs
-    classifier = 'sources'
-}
-
-tasks.register('javadoc', Javadoc) {
-    source = android.sourceSets.main.java.srcDirs
-    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
-}
-
-tasks.register('javadocJar', Jar) {
-    dependsOn javadoc
-    classifier = 'javadoc'
-    from javadoc.destinationDir
-}
-
-artifacts {
-    archives javadocJar
-    archives sourcesJar
 }

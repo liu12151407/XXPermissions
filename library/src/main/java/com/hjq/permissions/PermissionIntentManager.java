@@ -64,7 +64,7 @@ final class PermissionIntentManager {
             }
 
             if (PermissionUtils.areActivityIntent(context, addViewMonitorActivityIntent)) {
-                intent = StartActivityManager.addSubIntentToMainIntent(intent, addViewMonitorActivityIntent);
+                intent = PermissionActivityIntentHandler.addSubIntentForMainIntent(intent, addViewMonitorActivityIntent);
             }
         } else {
             // 3.1、其他的
@@ -73,12 +73,12 @@ final class PermissionIntentManager {
             }
 
             if (PermissionUtils.areActivityIntent(context, notificationManagementActivityIntent)) {
-                intent = StartActivityManager.addSubIntentToMainIntent(intent, notificationManagementActivityIntent);
+                intent = PermissionActivityIntentHandler.addSubIntentForMainIntent(intent, notificationManagementActivityIntent);
             }
         }
 
         if (PermissionUtils.areActivityIntent(context, huaWeiMobileManagerAppIntent)) {
-            intent = StartActivityManager.addSubIntentToMainIntent(intent, huaWeiMobileManagerAppIntent);
+            intent = PermissionActivityIntentHandler.addSubIntentForMainIntent(intent, huaWeiMobileManagerAppIntent);
         }
 
         return intent;
@@ -131,7 +131,7 @@ final class PermissionIntentManager {
         }
 
         if (PermissionUtils.areActivityIntent(context, oppoSafeCenterAppIntent)) {
-            intent = StartActivityManager.addSubIntentToMainIntent(intent, oppoSafeCenterAppIntent);;
+            intent = PermissionActivityIntentHandler.addSubIntentForMainIntent(intent, oppoSafeCenterAppIntent);;
         }
 
         return intent;
@@ -173,8 +173,8 @@ final class PermissionIntentManager {
     @Nullable
     static Intent getMiuiPermissionPageIntent(Context context) {
         Intent appPermEditorActionIntent = new Intent()
-                .setAction("miui.intent.action.APP_PERM_EDITOR")
-                .putExtra("extra_pkgname", context.getPackageName());
+            .setAction("miui.intent.action.APP_PERM_EDITOR")
+            .putExtra("extra_pkgname", context.getPackageName());
 
         Intent xiaoMiMobileManagerAppIntent = getXiaoMiMobileManagerAppIntent(context);
 
@@ -184,7 +184,7 @@ final class PermissionIntentManager {
         }
 
         if (PermissionUtils.areActivityIntent(context, xiaoMiMobileManagerAppIntent)) {
-            intent = StartActivityManager.addSubIntentToMainIntent(intent, xiaoMiMobileManagerAppIntent);
+            intent = PermissionActivityIntentHandler.addSubIntentForMainIntent(intent, xiaoMiMobileManagerAppIntent);
         }
 
         return intent;

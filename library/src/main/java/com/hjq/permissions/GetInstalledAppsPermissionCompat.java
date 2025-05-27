@@ -53,7 +53,7 @@ final class GetInstalledAppsPermissionCompat {
         if (AndroidVersion.isAndroid6() && isSupportGetInstalledAppsPermission(activity)) {
             // 如果支持申请，那么再去判断权限是否永久拒绝
             return !PermissionUtils.checkSelfPermission(activity, Permission.GET_INSTALLED_APPS) &&
-                    !PermissionUtils.shouldShowRequestPermissionRationale(activity, Permission.GET_INSTALLED_APPS);
+                !PermissionUtils.shouldShowRequestPermissionRationale(activity, Permission.GET_INSTALLED_APPS);
         }
 
         if (PhoneRomUtils.isMiui() && isMiuiSupportGetInstalledAppsPermission()) {
@@ -75,7 +75,7 @@ final class GetInstalledAppsPermissionCompat {
                 intent = PermissionIntentManager.getMiuiPermissionPageIntent(context);
             }
             // 另外跳转到应用详情页也可以开启读取应用列表权限
-            intent = StartActivityManager.addSubIntentToMainIntent(intent, PermissionIntentManager.getApplicationDetailsIntent(context));
+            intent = PermissionActivityIntentHandler.addSubIntentForMainIntent(intent, PermissionIntentManager.getApplicationDetailsIntent(context));
             return intent;
         }
 
@@ -85,7 +85,7 @@ final class GetInstalledAppsPermissionCompat {
     /**
      * 判断是否支持获取应用列表权限
      */
-    @RequiresApi(api = AndroidVersion.ANDROID_6)
+    @RequiresApi(AndroidVersion.ANDROID_6)
     @SuppressWarnings("deprecation")
     private static boolean isSupportGetInstalledAppsPermission(Context context) {
         try {
@@ -132,6 +132,6 @@ final class GetInstalledAppsPermissionCompat {
         } catch (NoSuchFieldException e) {
             e.printStackTrace();
         }
-        return true;
+        return false;
     }
 }

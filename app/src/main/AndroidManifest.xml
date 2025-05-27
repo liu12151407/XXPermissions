@@ -53,7 +53,7 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" tools:targetApi="s" />
 
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
@@ -106,5 +106,13 @@
             android:value="true" />
 
     </application>
+
+<!--    &lt;!&ndash; Android 11 软件包可见性适配：https://developer.android.google.cn/about/versions/11/privacy/package-visibility &ndash;&gt;-->
+<!--    <queries>-->
+<!--        &lt;!&ndash; 手机 QQ 的包名 &ndash;&gt;-->
+<!--        <package android:name="com.tencent.mobileqq" />-->
+<!--        &lt;!&ndash; 微信的包名 &ndash;&gt;-->
+<!--        <package android:name="com.tencent.mm" />-->
+<!--    </queries>-->
 
 </manifest>

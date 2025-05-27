@@ -9,10 +9,13 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.PackageManager.ResolveInfoFlags;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
@@ -22,13 +25,19 @@ import android.text.TextUtils;
 import android.view.Display;
 import android.view.Surface;
 import android.view.WindowManager;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Properties;
 import org.xmlpull.v1.XmlPullParserException;
 
 /**
@@ -45,7 +54,7 @@ final class PermissionUtils {
     /**
      * 判断某个危险权限是否授予了
      */
-    @RequiresApi(api = AndroidVersion.ANDROID_6)
+    @RequiresApi(AndroidVersion.ANDROID_6)
     static boolean checkSelfPermission(@NonNull Context context, @NonNull String permission) {
         return context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
     }
@@ -67,12 +76,10 @@ final class PermissionUtils {
                 e.printStackTrace();
                 opValue = opDefaultValue;
             }
-            Method checkOpNoThrowMethod = appOpsClass.getMethod("checkOpNoThrow", Integer.TYPE,
-                    Integer.TYPE, String.class);
-            return ((int) checkOpNoThrowMethod.invoke(appOps, opValue, uid, pkg)
-                    == AppOpsManager.MODE_ALLOWED);
+            Method checkOpNoThrowMethod = appOpsClass.getMethod("checkOpNoThrow", Integer.TYPE, Integer.TYPE, String.class);
+            return ((int) checkOpNoThrowMethod.invoke(appOps, opValue, uid, pkg) == AppOpsManager.MODE_ALLOWED);
         } catch (ClassNotFoundException | NoSuchMethodException |
-                InvocationTargetException | IllegalAccessException | RuntimeException e) {
+                 InvocationTargetException | IllegalAccessException | RuntimeException e) {
             return true;
         }
     }
@@ -80,14 +87,12 @@ final class PermissionUtils {
     @RequiresApi(AndroidVersion.ANDROID_4_4)
     static boolean checkOpNoThrow(Context context, String opName) {
         AppOpsManager appOps = (AppOpsManager)
-                context.getSystemService(Context.APP_OPS_SERVICE);
+            context.getSystemService(Context.APP_OPS_SERVICE);
         int mode;
         if (AndroidVersion.isAndroid10()) {
-            mode = appOps.unsafeCheckOpNoThrow(opName,
-                    context.getApplicationInfo().uid, context.getPackageName());
+            mode = appOps.unsafeCheckOpNoThrow(opName, context.getApplicationInfo().uid, context.getPackageName());
         } else {
-            mode = appOps.checkOpNoThrow(opName,
-                    context.getApplicationInfo().uid, context.getPackageName());
+            mode = appOps.checkOpNoThrow(opName, context.getApplicationInfo().uid, context.getPackageName());
         }
         return mode == AppOpsManager.MODE_ALLOWED;
     }
@@ -170,8 +175,7 @@ final class PermissionUtils {
             androidManifestInfo = AndroidManifestParser.parseAndroidManifest(context, apkPathCookie);
             // 如果读取到的包名和当前应用的包名不是同一个的话，证明这个清单文件的内容不是当前应用的
             // 具体案例：https://github.com/getActivity/XXPermissions/issues/102
-            if (!TextUtils.equals(context.getPackageName(),
-                    androidManifestInfo.packageName)) {
+            if (!TextUtils.equals(context.getPackageName(), androidManifestInfo.packageName)) {
                 return null;
             }
         } catch (IOException | XmlPullParserException e) {
@@ -179,50 +183,6 @@ final class PermissionUtils {
         }
 
         return androidManifestInfo;
-    }
-
-    /**
-     * 优化权限回调结果
-     */
-    static void optimizePermissionResults(Activity activity, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        for (int i = 0; i < permissions.length; i++) {
-
-            String permission = permissions[i];
-
-            // 如果这个权限是特殊权限，则需要重新检查权限的状态
-            if (PermissionApi.isSpecialPermission(permission)) {
-                grantResults[i] = PermissionApi.getPermissionResult(activity, permission);
-                continue;
-            }
-
-            // 如果是读取应用列表权限（国产权限），则需要重新检查权限的状态
-            if (PermissionUtils.equalsPermission(permission, Permission.GET_INSTALLED_APPS)) {
-                grantResults[i] = PermissionApi.getPermissionResult(activity, permission);
-                continue;
-            }
-
-            // 如果是在 Android 14 上面，并且是图片权限或者视频权限，则需要重新检查权限的状态
-            // 这是因为用户授权部分图片或者视频的时候，READ_MEDIA_VISUAL_USER_SELECTED 权限状态是授予的
-            // 但是 READ_MEDIA_IMAGES 和 READ_MEDIA_VIDEO 的权限状态是拒绝的
-            if (AndroidVersion.isAndroid14() &&
-                (PermissionUtils.equalsPermission(permission, Permission.READ_MEDIA_IMAGES) ||
-                PermissionUtils.equalsPermission(permission, Permission.READ_MEDIA_VIDEO))) {
-                grantResults[i] = PermissionApi.getPermissionResult(activity, permission);
-                continue;
-            }
-
-            if (AndroidVersion.isAndroid13() && AndroidVersion.getTargetSdkVersionCode(activity) >= AndroidVersion.ANDROID_13 &&
-                PermissionUtils.equalsPermission(permission, Permission.WRITE_EXTERNAL_STORAGE)) {
-                // 在 Android 13 不能申请 WRITE_EXTERNAL_STORAGE，会被系统直接拒绝，在这里需要重新检查权限的状态
-                grantResults[i] = PermissionApi.getPermissionResult(activity, permission);
-                continue;
-            }
-
-            if (Permission.getDangerPermissionFromAndroidVersion(permission) > AndroidVersion.getAndroidVersionCode()) {
-                // 如果是申请了新权限，但却是旧设备上面运行的，会被系统直接拒绝，在这里需要重新检查权限的状态
-                grantResults[i] = PermissionApi.getPermissionResult(activity, permission);
-            }
-        }
     }
 
     /**
@@ -294,18 +254,18 @@ final class PermissionUtils {
         try {
 
             if (AndroidVersion.getTargetSdkVersionCode(context) >= AndroidVersion.ANDROID_9 &&
-                    AndroidVersion.getAndroidVersionCode() >= AndroidVersion.ANDROID_9 &&
-                    AndroidVersion.getAndroidVersionCode() < AndroidVersion.ANDROID_11) {
+                AndroidVersion.getAndroidVersionCode() >= AndroidVersion.ANDROID_9 &&
+                AndroidVersion.getAndroidVersionCode() < AndroidVersion.ANDROID_11) {
 
                 // 反射套娃操作：实测这种方式只在 Android 9.0 和 Android 10.0 有效果，在 Android 11 上面就失效了
                 Method metaGetDeclaredMethod = Class.class.getDeclaredMethod(
-                        "getDeclaredMethod", String.class, Class[].class);
+                    "getDeclaredMethod", String.class, Class[].class);
                 metaGetDeclaredMethod.setAccessible(true);
                 // 注意 AssetManager.findCookieForPath 是 Android 9.0（API 28）的时候才添加的方法
                 // 而 Android 9.0 用的是 AssetManager.addAssetPath 来获取 cookie
                 // 具体可以参考 PackageParser.parseBaseApk 方法源码的实现
                 Method findCookieForPathMethod = (Method) metaGetDeclaredMethod.invoke(AssetManager.class,
-                        "findCookieForPath", new Class[]{String.class});
+                    "findCookieForPath", new Class[]{String.class});
                 if (findCookieForPathMethod != null) {
                     findCookieForPathMethod.setAccessible(true);
                     cookie = (Integer) findCookieForPathMethod.invoke(context.getAssets(), apkPath);
@@ -346,7 +306,7 @@ final class PermissionUtils {
             if (metaData != null && metaData.containsKey(metaKey)) {
                 return metaData.getBoolean(metaKey);
             }
-        } catch (PackageManager.NameNotFoundException e) {
+        } catch (NameNotFoundException e) {
             e.printStackTrace();
         }
         return false;
@@ -363,13 +323,11 @@ final class PermissionUtils {
             switch (activity.getResources().getConfiguration().orientation) {
                 case Configuration.ORIENTATION_LANDSCAPE:
                     activity.setRequestedOrientation(PermissionUtils.isActivityReverse(activity) ?
-                            ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE :
-                            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                        ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
                     break;
                 case Configuration.ORIENTATION_PORTRAIT:
                     activity.setRequestedOrientation(PermissionUtils.isActivityReverse(activity) ?
-                            ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT :
-                            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                        ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
                     break;
                 default:
                     break;
@@ -424,54 +382,9 @@ final class PermissionUtils {
         PackageManager packageManager = context.getPackageManager();
         if (AndroidVersion.isAndroid13()) {
             return !packageManager.queryIntentActivities(intent,
-                    PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY)).isEmpty();
+                    ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY)).isEmpty();
         }
         return !packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY).isEmpty();
-    }
-
-    /**
-     * 根据传入的权限自动选择最合适的权限设置页
-     *
-     * @param permissions                 请求失败的权限
-     */
-    static Intent getSmartPermissionIntent(@NonNull Context context, @Nullable List<String> permissions) {
-        // 如果失败的权限里面不包含特殊权限
-        if (permissions == null || permissions.isEmpty()) {
-            return PermissionIntentManager.getApplicationDetailsIntent(context);
-        }
-
-        // 危险权限统一处理
-        if (!PermissionApi.containsSpecialPermission(permissions)) {
-            if (permissions.size() == 1) {
-                return PermissionApi.getPermissionIntent(context, permissions.get(0));
-            }
-            return PermissionIntentManager.getApplicationDetailsIntent(context, permissions);
-        }
-
-        // 特殊权限统一处理
-        switch (permissions.size()) {
-            case 1:
-                // 如果当前只有一个权限被拒绝了
-                return PermissionApi.getPermissionIntent(context, permissions.get(0));
-            case 2:
-                if (!AndroidVersion.isAndroid13() &&
-                        PermissionUtils.containsPermission(permissions, Permission.NOTIFICATION_SERVICE) &&
-                        PermissionUtils.containsPermission(permissions, Permission.POST_NOTIFICATIONS)) {
-                    return PermissionApi.getPermissionIntent(context, Permission.NOTIFICATION_SERVICE);
-                }
-                break;
-            case 3:
-                if (AndroidVersion.isAndroid11() &&
-                        PermissionUtils.containsPermission(permissions, Permission.MANAGE_EXTERNAL_STORAGE) &&
-                        PermissionUtils.containsPermission(permissions, Permission.READ_EXTERNAL_STORAGE) &&
-                        PermissionUtils.containsPermission(permissions, Permission.WRITE_EXTERNAL_STORAGE)) {
-                    return PermissionApi.getPermissionIntent(context, Permission.MANAGE_EXTERNAL_STORAGE);
-                }
-                break;
-            default:
-                break;
-        }
-        return PermissionIntentManager.getApplicationDetailsIntent(context);
     }
 
     /**
@@ -496,12 +409,16 @@ final class PermissionUtils {
     /**
      * 判断权限集合中是否包含某个权限
      */
+    static boolean containsPermission(@NonNull String[] permissions, @NonNull String permission) {
+        return containsPermission(Arrays.asList(permissions), permission);
+    }
+
     static boolean containsPermission(@NonNull Collection<String> permissions, @NonNull String permission) {
         if (permissions.isEmpty()) {
             return false;
         }
         for (String s : permissions) {
-            // 使用 equalsPermission 来判断可以提升代码效率
+            // 使用 equalsPermission 来判断可以提升代码执行效率
             if (equalsPermission(s, permission)) {
                 return true;
             }
@@ -514,5 +431,88 @@ final class PermissionUtils {
      */
     static Uri getPackageNameUri(@NonNull Context context) {
         return Uri.parse("package:" + context.getPackageName());
+    }
+
+    /**
+     * 获取系统属性值（多种方式）
+     */
+    @NonNull
+    public static String getSystemPropertyValue(final String propertyName) {
+        String prop;
+        try {
+            prop = getSystemPropertyByReflect(propertyName);
+            if (prop != null && !prop.isEmpty()) {
+                return prop;
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            prop = getSystemPropertyByShell(propertyName);
+            if (prop != null && !prop.isEmpty()) {
+                return prop;
+            }
+        } catch (IOException ignored) {}
+
+        try {
+            prop = getSystemPropertyByStream(propertyName);
+            if (prop != null && !prop.isEmpty()) {
+                return prop;
+            }
+        } catch (IOException ignored) {}
+
+        return "";
+    }
+
+    /**
+     * 获取系统属性值（通过反射系统类）
+     */
+    @SuppressLint("PrivateApi")
+    private static String getSystemPropertyByReflect(String key) throws ClassNotFoundException, InvocationTargetException,
+                                                                        NoSuchMethodException, IllegalAccessException  {
+        Class<?> clz = Class.forName("android.os.SystemProperties");
+        Method getMethod = clz.getMethod("get", String.class, String.class);
+        return (String) getMethod.invoke(clz, key, "");
+    }
+
+    /**
+     * 获取系统属性值（通过 shell 命令）
+     */
+    private static String getSystemPropertyByShell(final String propName) throws IOException {
+        BufferedReader input = null;
+        try {
+            Process p = Runtime.getRuntime().exec("getprop " + propName);
+            input = new BufferedReader(new InputStreamReader(p.getInputStream()), 1024);
+            String firstLine = input.readLine();
+            if (firstLine != null) {
+                return firstLine;
+            }
+        } finally {
+            if (input != null) {
+                try {
+                    input.close();
+                } catch (IOException ignored) {}
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 获取系统属性值（通过读取系统文件）
+     */
+    private static String getSystemPropertyByStream(final String key) throws IOException {
+        FileInputStream inputStream = null;
+        try {
+            Properties prop = new Properties();
+            File file = new File(Environment.getRootDirectory(), "build.prop");
+            inputStream = new FileInputStream(file);
+            prop.load(inputStream);
+            return prop.getProperty(key, "");
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException ignored) {}
+            }
+        }
     }
 }
